@@ -105,7 +105,8 @@ def train(model: nn.Module, optimizer, device: str, loader: DataLoader, desc='Tr
             batch_size = texts.shape[0]
 
             optimizer.zero_grad()
-            loss, logits = model(texts, attention_mask=masks, labels=labels)
+            model_out = model(texts, attention_mask=masks, labels=labels)
+            loss, logits = model_out.loss, model_out.logits
             loss.backward()
             optimizer.step()
 

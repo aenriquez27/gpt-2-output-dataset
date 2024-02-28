@@ -22,7 +22,7 @@ def download(*datasets, data_dir='data'):
         dist.barrier()
 
     for ds in datasets:
-        assert ds in ALL_DATASETS, f'Unknown dataset {ds}'
+        #assert ds in ALL_DATASETS, f'Unknown dataset {ds}'
 
         for split in ['train', 'valid', 'test']:
             filename = ds + "." + split + '.jsonl'

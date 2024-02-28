@@ -6,6 +6,8 @@ import subprocess
 import sys
 from itertools import count
 from multiprocessing import Process
+import numpy as np
+
 
 import torch
 import torch.distributed as dist
@@ -19,6 +21,7 @@ from transformers import *
 from .dataset import Corpus, EncodedDataset
 from .download import download
 from .utils import summary, distributed
+from sklearn.model_selection import train_test_split
 
 
 def setup_distributed(port=29500):
@@ -42,33 +45,40 @@ def setup_distributed(port=29500):
 
 def load_datasets(data_dir, real_dataset, fake_dataset, tokenizer, batch_size,
                   max_sequence_length, random_sequence_length, epoch_size=None, token_dropout=None, seed=None):
-    if fake_dataset == 'TWO':
-        download(real_dataset, 'xl-1542M', 'xl-1542M-nucleus', data_dir=data_dir)
-    elif fake_dataset == 'THREE':
-        download(real_dataset, 'xl-1542M', 'xl-1542M-k40', 'xl-1542M-nucleus', data_dir=data_dir)
-    else:
-        download(real_dataset, fake_dataset, data_dir=data_dir)
+    
+    ####### This is commented out so it doesn't use their datasets
+    # if fake_dataset == 'TWO':
+    #     download(real_dataset, 'xl-1542M', 'xl-1542M-nucleus', data_dir=data_dir)
+    # elif fake_dataset == 'THREE':
+    #     download(real_dataset, 'xl-1542M', 'xl-1542M-k40', 'xl-1542M-nucleus', data_dir=data_dir)
+    # else:
+    #     download(real_dataset, fake_dataset, data_dir=data_dir)
 
-    real_corpus = Corpus(real_dataset, data_dir=data_dir)
+    # real_corpus = Corpus(real_dataset, data_dir=data_dir)
 
-    if fake_dataset == "TWO":
-        real_train, real_valid = real_corpus.train * 2, real_corpus.valid * 2
-        fake_corpora = [Corpus(name, data_dir=data_dir) for name in ['xl-1542M', 'xl-1542M-nucleus']]
-        fake_train = sum([corpus.train for corpus in fake_corpora], [])
-        fake_valid = sum([corpus.valid for corpus in fake_corpora], [])
-    elif fake_dataset == "THREE":
-        real_train, real_valid = real_corpus.train * 3, real_corpus.valid * 3
-        fake_corpora = [Corpus(name, data_dir=data_dir) for name in
-                        ['xl-1542M', 'xl-1542M-k40', 'xl-1542M-nucleus']]
-        fake_train = sum([corpus.train for corpus in fake_corpora], [])
-        fake_valid = sum([corpus.valid for corpus in fake_corpora], [])
-    else:
-        fake_corpus = Corpus(fake_dataset, data_dir=data_dir)
+    # if fake_dataset == "TWO":
+    #     real_train, real_valid = real_corpus.train * 2, real_corpus.valid * 2
+    #     fake_corpora = [Corpus(name, data_dir=data_dir) for name in ['xl-1542M', 'xl-1542M-nucleus']]
+    #     fake_train = sum([corpus.train for corpus in fake_corpora], [])
+    #     fake_valid = sum([corpus.valid for corpus in fake_corpora], [])
+    # elif fake_dataset == "THREE":
+    #     real_train, real_valid = real_corpus.train * 3, real_corpus.valid * 3
+    #     fake_corpora = [Corpus(name, data_dir=data_dir) for name in
+    #                     ['xl-1542M', 'xl-1542M-k40', 'xl-1542M-nucleus']]
+    #     fake_train = sum([corpus.train for corpus in fake_corpora], [])
+    #     fake_valid = sum([corpus.valid for corpus in fake_corpora], [])
+    # else:
+    #     fake_corpus = Corpus(fake_dataset, data_dir=data_dir)
 
-        real_train, real_valid = real_corpus.train, real_corpus.valid
-        fake_train, fake_valid = fake_corpus.train, fake_corpus.valid
+    #     real_train, real_valid = real_corpus.train, real_corpus.valid
+    #     fake_train, fake_valid = fake_corpus.train, fake_corpus.valid
 
     Sampler = DistributedSampler if distributed() and dist.get_world_size() > 1 else RandomSampler
+
+    ##### using train test split from my own dataset that gets called through function
+    real_train, real_valid = train_test_split(real_dataset, test_size=0.25, shuffle=True)
+
+    fake_train, fake_valid = train_test_split(fake_dataset, test_size=0.25, shuffle=True)
 
     min_sequence_length = 10 if random_sequence_length else None
     train_dataset = EncodedDataset(real_train, fake_train, tokenizer, max_sequence_length, min_sequence_length,

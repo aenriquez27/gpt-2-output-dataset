@@ -36,10 +36,10 @@ def setup_distributed(port=29500):
         os.environ["MASTER_ADDR"] = '127.0.0.1'
         os.environ["MASTER_PORT"] = str(port)
 
-        dist.init_process_group(backend="nccl", world_size=mpi_size, rank=mpi_rank)
+        dist.init_process_group(backend="gloo", world_size=mpi_size, rank=mpi_rank)
         return mpi_rank, mpi_size
 
-    dist.init_process_group(backend="nccl", init_method="env://")
+    dist.init_process_group(backend="gloo", init_method="env://")
     return dist.get_rank(), dist.get_world_size()
 
 
@@ -180,10 +180,10 @@ def _all_reduce_dict(d, device):
     output_d = {}
     for (key, value) in sorted(d.items()):
         tensor_input = torch.tensor([[value]]).to(device)
-        torch.distributed.all_reduce(tensor_input)
+       if distributed():
+            torch.distributed.all_reduce(tensor_input)
         output_d[key] = tensor_input.item()
     return output_d
-
 
 def run(max_epochs=None,
         device=None,

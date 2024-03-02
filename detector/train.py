@@ -179,10 +179,10 @@ def _all_reduce_dict(d, device):
     # wrap in tensor and use reduce to gpu0 tensor
     output_d = {}
     for (key, value) in sorted(d.items()):
-        tensor_input = torch.tensor([[value]]).to(device)
+       tensor_input = torch.tensor([[value]]).to(device)
        if distributed():
-            torch.distributed.all_reduce(tensor_input)
-        output_d[key] = tensor_input.item()
+          torch.distributed.all_reduce(tensor_input)
+       output_d[key] = tensor_input.item()
     return output_d
 
 def run(max_epochs=None,

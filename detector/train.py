@@ -7,6 +7,8 @@ import sys
 from itertools import count
 from multiprocessing import Process
 import numpy as np
+import json
+import pandas as pd
 
 
 import torch
@@ -18,9 +20,9 @@ from torch.utils.data import DataLoader, DistributedSampler, RandomSampler
 from tqdm import tqdm
 from transformers import *
 
-from .dataset import Corpus, EncodedDataset
-from .download import download
-from .utils import summary, distributed
+from dataset import Corpus, EncodedDataset
+from download import download
+from utils import summary, distributed
 from sklearn.model_selection import train_test_split
 
 
@@ -43,8 +45,8 @@ def setup_distributed(port=29500):
     return dist.get_rank(), dist.get_world_size()
 
 
-def load_datasets(data_dir, real_dataset, fake_dataset, tokenizer, batch_size,
-                  max_sequence_length, random_sequence_length, epoch_size=None, token_dropout=None, seed=None):
+def load_datasets(tokenizer, batch_size, max_sequence_length, 
+                  random_sequence_length, epoch_size=None, token_dropout=None, seed=None):
     
     ####### This is commented out so it doesn't use their datasets
     # if fake_dataset == 'TWO':
@@ -75,10 +77,27 @@ def load_datasets(data_dir, real_dataset, fake_dataset, tokenizer, batch_size,
 
     Sampler = DistributedSampler if distributed() and dist.get_world_size() > 1 else RandomSampler
 
-    ##### using train test split from my own dataset that gets called through function
-    real_train, real_valid = train_test_split(real_dataset, test_size=0.25, shuffle=True)
+    ### Load json files
+    #with open(r'C:\Users\aleja\Documents\Github\gpt-2-output-dataset\gpt-2-output-dataset\data\training profile sentence og batch real profiles.json', 'r') as f:
+    #     real_dataset = json.load(f)
 
-    fake_train, fake_valid = train_test_split(fake_dataset, test_size=0.25, shuffle=True)
+    #with open(r'C:\Users\aleja\Documents\Github\gpt-2-output-dataset\gpt-2-output-dataset\data\training profile sentence og batch fake profiles.json', 'r') as f:
+    #     fake_dataset = json.load(f)
+
+    rd = pd.read_excel(r'C:\Users\aleja\Documents\Github\gpt-2-output-dataset\gpt-2-output-dataset\data\training profile sentences real profiles matching.xlsx')
+
+    fd = pd.read_excel(r'C:\Users\aleja\Documents\Github\gpt-2-output-dataset\gpt-2-output-dataset\data\training profile sentence fake profiles matching.xlsx')
+
+    ##### using train test split from my own dataset that gets called through function
+    real_train, real_valid = train_test_split(rd, test_size=0.25, shuffle=True)
+
+    real_train = real_train.to_json()
+    real_valid = real_valid.to_json()
+
+    fake_train, fake_valid = train_test_split(fd, test_size=0.25, shuffle=True)
+
+    fake_train = fake_train.to_json()
+    fake_valid = fake_valid.to_json()
 
     min_sequence_length = 10 if random_sequence_length else None
     train_dataset = EncodedDataset(real_train, fake_train, tokenizer, max_sequence_length, min_sequence_length,
@@ -186,7 +205,7 @@ def _all_reduce_dict(d, device):
 
 def run(max_epochs=None,
         device=None,
-        batch_size=24,
+        batch_size=5, #24
         max_sequence_length=128,
         random_sequence_length=False,
         epoch_size=None,
@@ -224,7 +243,7 @@ def run(max_epochs=None,
     if world_size > 1:
         model = DistributedDataParallel(model, [rank], output_device=rank, find_unused_parameters=True)
 
-    train_loader, validation_loader = load_datasets(data_dir, real_dataset, fake_dataset, tokenizer, batch_size,
+    train_loader, validation_loader = load_datasets(tokenizer, batch_size,
                                                     max_sequence_length, random_sequence_length, epoch_size,
                                                     token_dropout, seed)
 
@@ -282,8 +301,8 @@ if __name__ == '__main__':
     parser.add_argument('--epoch-size', type=int, default=None)
     parser.add_argument('--seed', type=int, default=None)
     parser.add_argument('--data-dir', type=str, default='data')
-    parser.add_argument('--real-dataset', type=str, default='webtext')
-    parser.add_argument('--fake-dataset', type=str, default='xl-1542M-k40')
+    parser.add_argument('--real-dataset', type=str)
+    parser.add_argument('--fake-dataset', type=str)
     parser.add_argument('--token-dropout', type=float, default=None)
 
     parser.add_argument('--large', action='store_true', help='use the roberta-large model instead of roberta-base')
